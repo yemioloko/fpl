@@ -127,13 +127,35 @@ It pulls live bootstrap/fixtures/entry data, runs the routine below, and leaves 
 draft** to yemi.oloko@gmail.com — the Gmail connector can create drafts but not send, so the
 draft must be opened manually. Full output also lives at the routine's session link.
 
-**It runs in Anthropic's cloud and cannot read this directory.** The strategy is therefore
-duplicated verbatim inside the routine prompt. **Any change to the rules below must be
-mirrored into the routine** via `RemoteTrigger` `action: "update"`, or the weekly call will
-silently follow the old strategy. This is the main maintenance cost of the setup.
+### How it reads this file
 
-It also cannot write `season-log.md`. It emits a ready-to-paste log entry instead; paste it
-in, or ask in a session and it gets appended from the live API.
+It runs in Anthropic's cloud and cannot see this directory, so it fetches the strategy over
+plain HTTPS from the **public** GitHub mirror at `github.com/yemioloko/fpl`:
+
+```bash
+curl -s https://raw.githubusercontent.com/yemioloko/fpl/main/CLAUDE.md
+curl -s https://raw.githubusercontent.com/yemioloko/fpl/main/season-log.md
+```
+
+**So this file governs the weekly call directly — edit it, push, and next Thursday follows
+the new rules.** No routine update needed. The routine prompt is deliberately thin and defers
+to this file wherever the two could disagree.
+
+**Push after editing, or the change does not take effect:**
+```bash
+cd /Users/mac/Claude/FPL && git add -A && git commit -m "..." && git push
+```
+
+Why public: cloud routines could not attach the private repo. The Claude for GitHub app
+installs with *read access to administration, code and metadata* only, and three attempts to
+attach `yemioloko/fpl` as a private source returned `403 You don't have access to a
+repository this routine uses` even with the repo explicitly selected and the GitHub
+Integration connector showing connected. Public HTTPS reads sidestep the app entirely. The
+repo holds FPL strategy and a squad list — no credentials, nothing sensitive.
+
+**The routine cannot write back.** It emits a ready-to-paste `season-log.md` block plus a
+list of any corrections this file needs; paste them in and push, or ask in a session and they
+get applied from the live API.
 
 ## Weekly routine (run every Thursday or Friday before 17:30 UTC)
 
