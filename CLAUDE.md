@@ -117,45 +117,54 @@ ARS (5). Re-order this every week — it is the cheapest fixture-first decision 
 
 All four expire **2 Jan 2027**. Track this.
 
-## Automated weekly agent
+## How the weekly call happens: in-session, on demand
 
-**Routine `trig_019i3wag6sFoqcvcAdWaRnmF`** — cron `0 8 * * 4`, every Thursday 08:00 UTC
-(09:00 WAT), model Opus 5. Manage at https://claude.ai/code/routines/trig_019i3wag6sFoqcvcAdWaRnmF
-(Claude Code cannot delete routines; disable or delete via that page.)
+**Say "FPL check" in a Claude Code session on Thursday or Friday.** Claude then runs the
+weekly routine below against the live API and writes the result straight into
+`season-log.md`. That is the whole mechanism. Nothing is scheduled and nothing runs unless
+asked.
 
-It pulls live bootstrap/fixtures/entry data, runs the routine below, and leaves a **Gmail
-draft** to yemi.oloko@gmail.com — the Gmail connector can create drafts but not send, so the
-draft must be opened manually. Full output also lives at the routine's session link.
+Deadline is Friday 17:30 UTC / 18:30 WAT every week. Thursday leaves a day of slack for a
+price change or a late presser.
 
-### How it reads this file
+### Why not a scheduled cloud agent
 
-It runs in Anthropic's cloud and cannot see this directory, so it fetches the strategy over
-plain HTTPS from the **public** GitHub mirror at `github.com/yemioloko/fpl`:
+One was built and tested on 12 Aug 2026 (`trig_019i3wag6sFoqcvcAdWaRnmF`, now **disabled**).
+It failed for a reason no configuration fixes: **the cloud sandbox's egress proxy blocks
+`fantasy.premierleague.com`.**
 
-```bash
-curl -s https://raw.githubusercontent.com/yemioloko/fpl/main/CLAUDE.md
-curl -s https://raw.githubusercontent.com/yemioloko/fpl/main/season-log.md
+```
+curl: (56) CONNECT tunnel failed, response 403
+host: fantasy.premierleague.com:443     kind: connect_rejected
 ```
 
-**So this file governs the weekly call directly — edit it, push, and next Thursday follows
-the new rules.** No routine update needed. The routine prompt is deliberately thin and defers
-to this file wherever the two could disagree.
+Blocked on both paths — curl through the agent proxy, and the built-in fetch tool
+(`EGRESS_BLOCKED`). GitHub reads worked fine in the same run, so it is that host specifically.
+A weekly agent that cannot reach the FPL API has no call to make, and the run correctly
+aborted rather than inventing numbers.
 
-**Push after editing, or the change does not take effect:**
+Do not rebuild this without first confirming the environment can reach
+`fantasy.premierleague.com`. Two other dead ends found the same night, worth not repeating:
+
+- **Private repo as a routine source is unavailable.** Claude for GitHub installs with *read
+  access to administration, code and metadata* only; attaching `yemioloko/fpl` returned
+  `403 You don't have access to a repository this routine uses` even with the repo selected
+  and the GitHub Integration connector connected.
+- **The Gmail connector cannot send.** It exposes `create_draft`, `update_draft`,
+  `list_drafts`, read and label tools — no send action at any permission level. Resend can
+  send (`seamwox.com` is verified), and that is what the dormant routine is wired to.
+
+### The GitHub mirror
+
+`github.com/yemioloko/fpl` — **public**, holds this file and `season-log.md`. Public because
+private-repo access failed; content is strategy and a squad list, no credentials.
+
+It is durable state, not part of the weekly loop. Push after editing so the mirror stays
+current:
+
 ```bash
 cd /Users/mac/Claude/FPL && git add -A && git commit -m "..." && git push
 ```
-
-Why public: cloud routines could not attach the private repo. The Claude for GitHub app
-installs with *read access to administration, code and metadata* only, and three attempts to
-attach `yemioloko/fpl` as a private source returned `403 You don't have access to a
-repository this routine uses` even with the repo explicitly selected and the GitHub
-Integration connector showing connected. Public HTTPS reads sidestep the app entirely. The
-repo holds FPL strategy and a squad list — no credentials, nothing sensitive.
-
-**The routine cannot write back.** It emits a ready-to-paste `season-log.md` block plus a
-list of any corrections this file needs; paste them in and push, or ask in a session and they
-get applied from the live API.
 
 ## Weekly routine (run every Thursday or Friday before 17:30 UTC)
 
